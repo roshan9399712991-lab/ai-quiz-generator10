@@ -1,0 +1,423 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Quiz Generator 10</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial}
+body{
+ background:linear-gradient(135deg,#10152f,#263c70);
+ color:white;min-height:100vh;padding:20px;
+}
+.container{max-width:900px;margin:auto}
+header{text-align:center;padding:25px}
+header h1{font-size:36px;color:#63e8ff}
+header p{color:#ccc;margin-top:10px}
+.card{
+ background:#ffffff12;border:1px solid #ffffff25;
+ border-radius:18px;padding:25px;margin:20px 0;
+ box-shadow:0 10px 30px #0004;
+}
+h2{margin-bottom:15px}
+label{display:block;margin:15px 0 7px}
+input,select{
+ width:100%;padding:13px;border-radius:9px;
+ border:1px solid #52617a;background:#172746;
+ color:white;font-size:16px;
+}
+button{
+ padding:13px 20px;border:0;border-radius:9px;
+ background:#00d4ff;color:#10203a;font-weight:bold;
+ font-size:15px;cursor:pointer;transition:.2s;
+}
+button:hover{filter:brightness(1.15)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{width:100%;margin-top:20px}
+.hidden{display:none!important}
+.note{font-size:12px;color:#bbb;line-height:1.6;margin-top:10px}
+.stats{
+ display:grid;grid-template-columns:repeat(3,1fr);
+ gap:10px;margin:15px 0;
+}
+.stat{
+ background:#152a4b;padding:15px;border-radius:12px;
+ text-align:center;
+}
+.stat strong{display:block;color:#65eaff;font-size:23px}
+.progress{
+ height:9px;background:#394c69;border-radius:20px;
+ overflow:hidden;margin:15px 0;
+}
+#bar{height:100%;background:#00e4a2;width:0%;transition:.3s}
+.option{
+ width:100%;text-align:left;display:block;
+ margin:12px 0;background:#253c60;
+ color:white;border:1px solid #536b91;
+}
+.option.correct{background:#137a48}
+.option.wrong{background:#a42e42}
+.question{font-size:21px;line-height:1.5;margin:20px 0}
+#feedback{margin:20px 0;line-height:1.6}
+.result{text-align:center}
+.result h1{font-size:45px;color:#63e8ff;margin:20px}
+#leaderboard{line-height:2}
+footer{text-align:center;color:#aaa;padding:20px}
+@media(max-width:550px){
+ header h1{font-size:27px}
+ .card{padding:17px}
+ .stats{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+ <h1>🧠 AI Quiz Generator 10</h1>
+ <p>Learn • Play • Challenge Yourself • Win</p>
+</header>
+
+<!-- HOME -->
+<section class="card" id="home">
+ <h2>🚀 Create Your AI Quiz</h2>
+
+ <label>Groq API Key</label>
+ <input type="password" id="apiKey" placeholder="Enter Groq API Key">
+
+ <label>Player Name</label>
+ <input id="player" placeholder="Enter your name">
+
+ <label>Quiz Topic</label>
+ <input id="topic" placeholder="Python, Science, Maths, History, AI...">
+
+ <label>Difficulty</label>
+ <select id="difficulty">
+  <option>Easy</option>
+  <option selected>Medium</option>
+  <option>Hard</option>
+ </select>
+
+ <label>Number of Questions</label>
+ <select id="count">
+  <option value="5">5 Questions</option>
+  <option value="10">10 Questions</option>
+  <option value="15">15 Questions</option>
+  <option value="20">20 Questions</option>
+ </select>
+
+ <label>Time Per Question</label>
+ <select id="seconds">
+  <option value="15">15 Seconds</option>
+  <option value="30" selected>30 Seconds</option>
+  <option value="60">60 Seconds</option>
+ </select>
+
+ <button class="primary" id="generate">✨ Generate Quiz</button>
+ <p class="note">
+ API Key: <a style="color:#63e8ff" href="https://console.groq.com/keys" target="_blank">Get Groq API Key</a>.
+ Keep your key private. Do not publish it in a public GitHub repository.
+ </p>
+ <button class="primary" onclick="showBoard()">🏆 View Leaderboard</button>
+</section>
+
+<!-- LOADING -->
+<section class="card hidden" id="loading">
+ <h2>🤖 AI is creating your quiz...</h2>
+ <p>Please wait while questions are generated.</p>
+</section>
+
+<!-- QUIZ -->
+<section class="card hidden" id="quiz">
+ <div class="stats">
+  <div class="stat">Question<strong id="qno">1</strong></div>
+  <div class="stat">Score<strong id="points">0</strong></div>
+  <div class="stat">Time<strong id="clock">30</strong></div>
+ </div>
+
+ <div class="progress"><div id="bar"></div></div>
+ <div class="question" id="question"></div>
+ <div id="options"></div>
+ <div id="feedback"></div>
+ <button class="primary hidden" id="next">Next Question ➜</button>
+</section>
+
+<!-- RESULT -->
+<section class="card result hidden" id="result">
+ <h2>🎉 Quiz Completed!</h2>
+ <h1 id="final">0/0</h1>
+ <h3 id="percent">0%</h3>
+ <p id="message"></p>
+ <br>
+ <button onclick="newQuiz()">🔄 Play Again</button>
+ <button onclick="showBoard()">🏆 Leaderboard</button>
+</section>
+
+<!-- LEADERBOARD -->
+<section class="card hidden" id="board">
+ <h2>🏆 Local Leaderboard</h2>
+ <div id="leaderboard"></div>
+ <br>
+ <button onclick="backHome()">⬅ Back</button>
+ <button onclick="clearBoard()">Clear Scores</button>
+</section>
+
+<footer>AI Quiz Generator 10 | Powered by Groq AI</footer>
+</div>
+
+<script>
+let questions=[];
+let current=0;
+let score=0;
+let seconds=30;
+let timer=null;
+let answered=false;
+let playerName="Player";
+
+const $=id=>document.getElementById(id);
+
+function screen(id){
+ ["home","loading","quiz","result","board"].forEach(x=>{
+  $(x).classList.toggle("hidden",x!==id);
+ });
+}
+
+$("generate").addEventListener("click",generateQuiz);
+
+async function generateQuiz(){
+ const key=$("apiKey").value.trim();
+ const topic=$("topic").value.trim();
+ playerName=$("player").value.trim()||"Player";
+ const count=Number($("count").value);
+
+ if(!key||!topic){
+  alert("Enter API key and topic!");
+  return;
+ }
+
+ seconds=Number($("seconds").value);
+ $("generate").disabled=true;
+ screen("loading");
+
+ const prompt=`
+Create exactly ${count} multiple-choice questions on ${topic}.
+Difficulty: ${$("difficulty").value}.
+Return ONLY valid JSON:
+{
+ "questions":[
+  {
+   "question":"Question",
+   "options":["A","B","C","D"],
+   "answer":0,
+   "explanation":"Explanation"
+  }
+ ]
+}
+Rules:
+- Exactly ${count} questions.
+- Exactly 4 options per question.
+- answer is zero-based index 0 to 3.
+- Questions must be accurate and unique.
+- Do not include markdown.
+`;
+
+ try{
+  const res=await fetch(
+   "https://api.groq.com/openai/v1/chat/completions",
+   {
+    method:"POST",
+    headers:{
+     "Content-Type":"application/json",
+     "Authorization":"Bearer "+key
+    },
+    body:JSON.stringify({
+     model:"llama-3.3-70b-versatile",
+     messages:[
+      {role:"system",content:"You are a professional quiz creator. Return valid JSON only."},
+      {role:"user",content:prompt}
+     ],
+     temperature:0.7,
+     max_tokens:6500,
+     response_format:{type:"json_object"}
+    })
+   }
+  );
+
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error?.message||"API Error");
+
+  const parsed=JSON.parse(data.choices[0].message.content);
+  if(!Array.isArray(parsed.questions)||parsed.questions.length!==count)
+   throw new Error("Invalid question count. Please try again.");
+
+  parsed.questions.forEach(q=>{
+   if(typeof q.question!=="string"||
+      !Array.isArray(q.options)||q.options.length!==4||
+      q.options.some(o=>typeof o!=="string")||
+      !Number.isInteger(q.answer)||q.answer<0||q.answer>3)
+    throw new Error("Invalid question returned by AI.");
+  });
+
+  questions=parsed.questions;
+  current=0;
+  score=0;
+  screen("quiz");
+  showQuestion();
+
+ }catch(e){
+  alert("Error: "+e.message);
+  screen("home");
+ }finally{
+  $("generate").disabled=false;
+ }
+}
+
+function showQuestion(){
+ clearInterval(timer);
+ answered=false;
+ const q=questions[current];
+
+ $("qno").textContent=(current+1)+"/"+questions.length;
+ $("points").textContent=score;
+ $("question").textContent=q.question;
+ $("feedback").textContent="";
+ $("next").classList.add("hidden");
+ $("bar").style.width=(current/questions.length*100)+"%";
+
+ const area=$("options");
+ area.innerHTML="";
+
+ q.options.forEach((option,i)=>{
+  const btn=document.createElement("button");
+  btn.className="option";
+  btn.textContent=String.fromCharCode(65+i)+". "+option;
+  btn.onclick=()=>answer(i);
+  area.appendChild(btn);
+ });
+
+ startTimer();
+}
+
+function startTimer(){
+ let left=seconds;
+ $("clock").textContent=left;
+
+ timer=setInterval(()=>{
+  left--;
+  $("clock").textContent=left;
+
+  if(left<=0){
+   clearInterval(timer);
+   answer(-1);
+  }
+ },1000);
+}
+
+function answer(choice){
+ if(answered)return;
+ answered=true;
+ clearInterval(timer);
+
+ const q=questions[current];
+ const buttons=document.querySelectorAll(".option");
+
+ buttons.forEach((btn,i)=>{
+  btn.disabled=true;
+  if(i===q.answer)btn.classList.add("correct");
+  if(i===choice&&choice!==q.answer)btn.classList.add("wrong");
+ });
+
+ if(choice===q.answer){
+  score++;
+  $("feedback").textContent="✅ Correct! "+(q.explanation||"");
+ }else if(choice===-1){
+  $("feedback").textContent="⏰ Time Up! Answer: "+q.options[q.answer]+". "+(q.explanation||"");
+ }else{
+  $("feedback").textContent="❌ Incorrect! Answer: "+q.options[q.answer]+". "+(q.explanation||"");
+ }
+
+ $("points").textContent=score;
+ $("next").classList.remove("hidden");
+ $("next").textContent=current===questions.length-1?"🏆 Finish Quiz":"Next Question ➜";
+}
+
+$("next").onclick=()=>{
+ if(!answered)return;
+ current++;
+ if(current<questions.length){
+  showQuestion();
+ }else{
+  finishQuiz();
+ }
+};
+
+function finishQuiz(){
+ clearInterval(timer);
+ const percentage=Math.round(score/questions.length*100);
+
+ $("final").textContent=score+"/"+questions.length;
+ $("percent").textContent=percentage+"%";
+
+ $("message").textContent=
+ percentage>=80?"🏆 Excellent Performance!":
+ percentage>=50?"👏 Good Job! Keep Practicing!":
+ "💪 Keep Learning and Try Again!";
+
+ saveScore(playerName,score,questions.length);
+ screen("result");
+}
+
+function saveScore(name,score,total){
+ try{
+  let data=JSON.parse(localStorage.getItem("aiQuizScores")||"[]");
+  data.push({
+   name,score,total,
+   date:new Date().toLocaleDateString()
+  });
+  data.sort((a,b)=>b.score/b.total-a.score/a.total);
+  localStorage.setItem("aiQuizScores",JSON.stringify(data.slice(0,10)));
+ }catch(e){
+  console.error("Could not save score",e);
+ }
+}
+
+function showBoard(){
+ let data=[];
+ try{
+  data=JSON.parse(localStorage.getItem("aiQuizScores")||"[]");
+ }catch(e){}
+
+ $("leaderboard").innerHTML="";
+ if(!data.length){
+  $("leaderboard").textContent="No scores yet. Play a quiz first!";
+ }else{
+  data.forEach((p,i)=>{
+   const row=document.createElement("p");
+   row.textContent=`${i+1}. ${p.name} — ${p.score}/${p.total} (${Math.round(p.score/p.total*100)}%) — ${p.date}`;
+   $("leaderboard").appendChild(row);
+  });
+ }
+ screen("board");
+}
+
+function clearBoard(){
+ if(confirm("Delete all leaderboard scores?")){
+  localStorage.removeItem("aiQuizScores");
+  showBoard();
+ }
+}
+
+function newQuiz(){
+ clearInterval(timer);
+ screen("home");
+}
+
+function backHome(){
+ screen("home");
+}
+</script>
+</body>
+</html>
